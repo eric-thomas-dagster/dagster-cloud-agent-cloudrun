@@ -1,0 +1,85 @@
+# Dagster Cloud Agent Configuration for Google Cloud Run
+#
+# This configuration enables a fully serverless Dagster deployment on Google Cloud:
+# - Agent runs on Cloud Run (always-on, min instances = 1)
+# - Code servers launch on Cloud Run (auto-scale, can scale to zero)
+# - Run workers launch on Cloud Run Jobs (ephemeral, one per run)
+# - All within customer's GCP project
+
+# Agent instance configuration
+instance_class:
+  module: dagster_cloud.instance
+  class: DagsterCloudAgentInstance
+
+# User code launcher - Custom Cloud Run implementation
+user_code_launcher:
+  module: cloudrun_launcher
+  class: CloudRunUserCodeLauncher
+  config:
+    # GCP project ID where Cloud Run services will be created
+    # Can be set via environment variable GCP_PROJECT_ID
+    project_id: ${GCP_PROJECT_ID}
+
+    # GCP region for Cloud Run services
+    # Can be set via environment variable GCP_REGION
+    region: ${GCP_REGION:us-central1}
+
+    # Service account for code servers (optional)
+    # If not specified, uses the default compute service account
+    code_server_service_account: ${CODE_SERVER_SERVICE_ACCOUNT}
+
+    # Default compute resources for code servers
+    # Can be overridden per code location via container_context
+    cpu: "1"          # CPU cores (0.5, 1, 2, 4, etc.)
+    memory: "2Gi"     # Memory (512Mi, 1Gi, 2Gi, 4Gi, etc.)
+
+    # Auto-scaling configuration
+    min_instances: 0     # Scale to zero when idle (saves costs)
+    max_instances: 10    # Maximum concurrent instances
+
+    # Request timeout in seconds
+    timeout: 3600
+
+# Run launcher - Custom Cloud Run Jobs implementation
+run_launcher:
+  module: cloudrun_launcher
+  class: CloudRunRunLauncher
+  config:
+    # GCP project ID where Cloud Run jobs will be created
+    project_id: ${GCP_PROJECT_ID}
+
+    # GCP region for Cloud Run jobs
+    region: ${GCP_REGION:us-central1}
+
+    # Service account for run jobs (optional)
+    service_account: ${RUN_SERVICE_ACCOUNT}
+
+    # Default compute resources for run workers
+    cpu: "1"
+    memory: "2Gi"
+
+    # Job timeout in seconds
+    timeout: 3600
+
+# Agent settings
+dagster_cloud_api:
+  # Agent token (fetched from Secret Manager by entrypoint.py)
+  agent_token: ${DAGSTER_CLOUD_API_TOKEN}
+
+  # Dagster Cloud URL (constructed from org ID)
+  # Format: https://{org}.agent.dagster.cloud
+  url: https://${DAGSTER_CLOUD_ORG_ID}.agent.dagster.cloud
+
+  # Deployment name
+  deployment: ${DAGSTER_CLOUD_DEPLOYMENT_NAME:prod}
+
+# Logging configuration
+python_logs:
+  # Log level for agent
+  python_log_level: INFO
+
+  # Structured logging for Cloud Logging integration
+  managed_python_loggers:
+    - dagster_cloud
+    - cloudrun_launcher
+    - google.cloud.run_v2

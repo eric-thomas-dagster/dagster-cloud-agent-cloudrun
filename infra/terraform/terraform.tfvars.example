@@ -1,0 +1,20 @@
+# Example Terraform variables for deploying Dagster Cloud agent to Google Cloud Run
+# Copy this file to terraform.tfvars and fill in your values
+
+# GCP Configuration
+project_id = "my-gcp-project"
+region     = "us-central1"
+
+# Agent Configuration
+agent_service_name = "dagster-agent"
+agent_image        = "ghcr.io/my-username/dagster-cloudrun-agent:latest"
+agent_cpu          = "1"
+agent_memory       = "1Gi"
+
+# Dagster Cloud Configuration
+dagster_cloud_api_token        = "your-dagster-cloud-agent-token-here"
+dagster_cloud_org_id           = "your-org-id"
+dagster_cloud_deployment_name  = "prod"
+
+# Optional: Enable if using private images in Artifact Registry
+enable_artifact_registry_access = false

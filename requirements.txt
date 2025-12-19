@@ -1,0 +1,7 @@
+# Google Cloud SDKs
+google-cloud-secret-manager>=2.16.0
+google-cloud-run>=0.10.0
+
+# Google auth
+google-auth>=2.23.0
+google-api-core>=2.11.0
