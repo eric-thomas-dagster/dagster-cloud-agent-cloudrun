@@ -9,7 +9,8 @@
 This repository provides a complete solution for running Dagster Cloud (Dagster+) on Google Cloud Run, including:
 - ✅ Custom agent that automatically creates code servers on Cloud Run
 - ✅ Ephemeral run workers as Cloud Run Jobs
-- ✅ Ready-to-deploy Terraform templates
+- ✅ Ready-to-deploy **Terraform** templates (recommended)
+- ✅ Native **Deployment Manager** templates (GCP's ARM/Bicep equivalent)
 - ✅ Secure secrets management via Google Secret Manager
 - ✅ Production-ready with auto-scaling and scale-to-zero
 
@@ -21,7 +22,7 @@ This repository provides a complete solution for running Dagster Cloud (Dagster+
 
 - Google Cloud Project with billing enabled
 - [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) installed
-- [Terraform](https://www.terraform.io/downloads) installed
+- **Choose one:** [Terraform](https://www.terraform.io/downloads) (recommended) OR Deployment Manager (native GCP)
 - Docker installed
 - Dagster Cloud account with an agent token
 
@@ -49,7 +50,9 @@ docker tag dagster-cloudrun-agent:latest ghcr.io/YOUR_USERNAME/dagster-cloudrun-
 docker push ghcr.io/YOUR_USERNAME/dagster-cloudrun-agent:latest
 ```
 
-### Step 3: Deploy with Terraform
+### Step 3: Deploy Infrastructure
+
+**Option A: Terraform (Recommended)**
 
 ```bash
 cd infra/terraform
@@ -73,6 +76,24 @@ terraform plan
 terraform apply
 ```
 
+**Option B: Deployment Manager (Native GCP)**
+
+```bash
+cd infra/deployment-manager
+
+# Copy the example config
+cp dagster-agent.yaml dagster-agent-config.yaml
+
+# Edit dagster-agent-config.yaml with your values
+# Note: Secrets must be base64 encoded
+
+# Deploy
+gcloud deployment-manager deployments create dagster-agent \
+  --config dagster-agent-config.yaml
+```
+
+See [infra/deployment-manager/README.md](infra/deployment-manager/README.md) for detailed Deployment Manager instructions.
+
 ### Step 4: Verify Agent Connection
 
 Check your Dagster Cloud deployment to see the agent status:
@@ -89,11 +110,15 @@ Check your Dagster Cloud deployment to see the agent status:
 │   ├── dagster.yaml           # Agent configuration
 │   └── entrypoint.py          # Fetches secrets, starts agent
 ├── infra/
-│   └── terraform/
-│       ├── main.tf            # Main Terraform configuration
-│       ├── variables.tf       # Input variables
-│       ├── outputs.tf         # Output values
-│       └── terraform.tfvars.example  # Example configuration
+│   ├── terraform/             # Terraform IaC (recommended)
+│   │   ├── main.tf            # Main Terraform configuration
+│   │   ├── variables.tf       # Input variables
+│   │   ├── outputs.tf         # Output values
+│   │   └── terraform.tfvars.example  # Example configuration
+│   └── deployment-manager/    # Google Deployment Manager (native)
+│       ├── dagster-agent.jinja  # Main template
+│       ├── dagster-agent.yaml   # Configuration example
+│       └── README.md            # Deployment Manager guide
 ├── Dockerfile                 # Builds custom agent image
 ├── requirements.txt           # Python dependencies
 └── README.md                  # This file

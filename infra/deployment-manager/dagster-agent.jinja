@@ -1,0 +1,195 @@
+{#
+Google Cloud Deployment Manager Jinja2 Template
+Dagster Cloud Agent on Cloud Run
+
+This template creates all necessary resources for running a Dagster Cloud agent on Cloud Run
+#}
+
+resources:
+# Service Account for the Dagster Agent
+- name: {{ properties['agentServiceAccountName'] }}
+  type: iam.v1.serviceAccount
+  properties:
+    accountId: {{ properties['agentServiceAccountName'] }}
+    displayName: Dagster Cloud Agent
+    description: Service account for Dagster Cloud hybrid agent on Cloud Run
+
+# Service Account for Code Servers and Run Jobs
+- name: {{ properties['workloadsServiceAccountName'] }}
+  type: iam.v1.serviceAccount
+  properties:
+    accountId: {{ properties['workloadsServiceAccountName'] }}
+    displayName: Dagster Workloads
+    description: Service account for Dagster code servers and run jobs
+
+# IAM Policy Binding - Agent SA can manage Cloud Run
+- name: agent-run-admin-binding
+  type: gcp-types/cloudresourcemanager-v1:virtual.projects.iamMemberBinding
+  properties:
+    resource: {{ properties['projectId'] }}
+    role: roles/run.admin
+    member: serviceAccount:$(ref.{{ properties['agentServiceAccountName'] }}.email)
+
+# IAM Policy Binding - Agent can act as workloads SA
+- name: agent-sa-user-binding
+  type: gcp-types/iam-v1:virtual.projects.serviceAccounts.iamMemberBinding
+  properties:
+    resource: projects/{{ properties['projectId'] }}/serviceAccounts/$(ref.{{ properties['workloadsServiceAccountName'] }}.email)
+    role: roles/iam.serviceAccountUser
+    member: serviceAccount:$(ref.{{ properties['agentServiceAccountName'] }}.email)
+
+# Secret Manager Secret - Dagster Cloud API Token
+- name: {{ properties['dagsterTokenSecretName'] }}
+  type: gcp-types/secretmanager-v1:projects.secrets
+  properties:
+    parent: projects/{{ properties['projectId'] }}
+    secretId: {{ properties['dagsterTokenSecretName'] }}
+    replication:
+      automatic: {}
+    labels:
+      managed-by: deployment-manager
+      purpose: dagster-agent
+
+# Secret Version - Dagster Cloud API Token Value
+- name: {{ properties['dagsterTokenSecretName'] }}-version
+  type: gcp-types/secretmanager-v1:projects.secrets.versions
+  properties:
+    parent: projects/{{ properties['projectId'] }}/secrets/{{ properties['dagsterTokenSecretName'] }}
+    payload:
+      data: {{ properties['dagsterCloudApiToken'] }}
+  metadata:
+    dependsOn:
+    - {{ properties['dagsterTokenSecretName'] }}
+
+# IAM Policy Binding - Agent can access token secret
+- name: agent-token-secret-accessor
+  type: gcp-types/secretmanager-v1:virtual.projects.secrets.iamMemberBinding
+  properties:
+    resource: projects/{{ properties['projectId'] }}/secrets/{{ properties['dagsterTokenSecretName'] }}
+    role: roles/secretmanager.secretAccessor
+    member: serviceAccount:$(ref.{{ properties['agentServiceAccountName'] }}.email)
+  metadata:
+    dependsOn:
+    - {{ properties['dagsterTokenSecretName'] }}
+
+# Secret Manager Secret - Dagster Organization ID
+- name: {{ properties['dagsterOrgIdSecretName'] }}
+  type: gcp-types/secretmanager-v1:projects.secrets
+  properties:
+    parent: projects/{{ properties['projectId'] }}
+    secretId: {{ properties['dagsterOrgIdSecretName'] }}
+    replication:
+      automatic: {}
+    labels:
+      managed-by: deployment-manager
+      purpose: dagster-agent
+
+# Secret Version - Dagster Organization ID Value
+- name: {{ properties['dagsterOrgIdSecretName'] }}-version
+  type: gcp-types/secretmanager-v1:projects.secrets.versions
+  properties:
+    parent: projects/{{ properties['projectId'] }}/secrets/{{ properties['dagsterOrgIdSecretName'] }}
+    payload:
+      data: {{ properties['dagsterCloudOrgId'] }}
+  metadata:
+    dependsOn:
+    - {{ properties['dagsterOrgIdSecretName'] }}
+
+# IAM Policy Binding - Agent can access org ID secret
+- name: agent-org-secret-accessor
+  type: gcp-types/secretmanager-v1:virtual.projects.secrets.iamMemberBinding
+  properties:
+    resource: projects/{{ properties['projectId'] }}/secrets/{{ properties['dagsterOrgIdSecretName'] }}
+    role: roles/secretmanager.secretAccessor
+    member: serviceAccount:$(ref.{{ properties['agentServiceAccountName'] }}.email)
+  metadata:
+    dependsOn:
+    - {{ properties['dagsterOrgIdSecretName'] }}
+
+# Secret Manager Secret - Dagster Deployment Name
+- name: {{ properties['dagsterDeploymentSecretName'] }}
+  type: gcp-types/secretmanager-v1:projects.secrets
+  properties:
+    parent: projects/{{ properties['projectId'] }}
+    secretId: {{ properties['dagsterDeploymentSecretName'] }}
+    replication:
+      automatic: {}
+    labels:
+      managed-by: deployment-manager
+      purpose: dagster-agent
+
+# Secret Version - Dagster Deployment Name Value
+- name: {{ properties['dagsterDeploymentSecretName'] }}-version
+  type: gcp-types/secretmanager-v1:projects.secrets.versions
+  properties:
+    parent: projects/{{ properties['projectId'] }}/secrets/{{ properties['dagsterDeploymentSecretName'] }}
+    payload:
+      data: {{ properties['dagsterCloudDeploymentName'] }}
+  metadata:
+    dependsOn:
+    - {{ properties['dagsterDeploymentSecretName'] }}
+
+# IAM Policy Binding - Agent can access deployment secret
+- name: agent-deployment-secret-accessor
+  type: gcp-types/secretmanager-v1:virtual.projects.secrets.iamMemberBinding
+  properties:
+    resource: projects/{{ properties['projectId'] }}/secrets/{{ properties['dagsterDeploymentSecretName'] }}
+    role: roles/secretmanager.secretAccessor
+    member: serviceAccount:$(ref.{{ properties['agentServiceAccountName'] }}.email)
+  metadata:
+    dependsOn:
+    - {{ properties['dagsterDeploymentSecretName'] }}
+
+# Cloud Run Service - Dagster Agent
+- name: {{ properties['agentServiceName'] }}
+  type: gcp-types/run-v2:projects.locations.services
+  properties:
+    parent: projects/{{ properties['projectId'] }}/locations/{{ properties['region'] }}
+    serviceId: {{ properties['agentServiceName'] }}
+    template:
+      serviceAccount: $(ref.{{ properties['agentServiceAccountName'] }}.email)
+      scaling:
+        minInstanceCount: 1
+        maxInstanceCount: 1
+      timeout: 3600s
+      containers:
+      - image: {{ properties['agentImage'] }}
+        env:
+        - name: GCP_PROJECT_ID
+          value: {{ properties['projectId'] }}
+        - name: GCP_REGION
+          value: {{ properties['region'] }}
+        - name: SECRET_NAMES
+          value: "{{ properties['dagsterTokenSecretName'] }}:DAGSTER_CLOUD_API_TOKEN,{{ properties['dagsterOrgIdSecretName'] }}:DAGSTER_CLOUD_ORG_ID,{{ properties['dagsterDeploymentSecretName'] }}:DAGSTER_CLOUD_DEPLOYMENT_NAME"
+        - name: CODE_SERVER_SERVICE_ACCOUNT
+          value: $(ref.{{ properties['workloadsServiceAccountName'] }}.email)
+        - name: RUN_SERVICE_ACCOUNT
+          value: $(ref.{{ properties['workloadsServiceAccountName'] }}.email)
+        resources:
+          limits:
+            cpu: "{{ properties['agentCpu'] }}"
+            memory: {{ properties['agentMemory'] }}
+    labels:
+      managed-by: deployment-manager
+      purpose: dagster-agent
+  metadata:
+    dependsOn:
+    - agent-run-admin-binding
+    - agent-sa-user-binding
+    - {{ properties['dagsterTokenSecretName'] }}-version
+    - {{ properties['dagsterOrgIdSecretName'] }}-version
+    - {{ properties['dagsterDeploymentSecretName'] }}-version
+
+outputs:
+- name: agentServiceName
+  value: {{ properties['agentServiceName'] }}
+- name: agentServiceAccountEmail
+  value: $(ref.{{ properties['agentServiceAccountName'] }}.email)
+- name: workloadsServiceAccountEmail
+  value: $(ref.{{ properties['workloadsServiceAccountName'] }}.email)
+- name: projectId
+  value: {{ properties['projectId'] }}
+- name: region
+  value: {{ properties['region'] }}
+- name: consoleUrl
+  value: https://console.cloud.google.com/run/detail/{{ properties['region'] }}/{{ properties['agentServiceName'] }}/metrics?project={{ properties['projectId'] }}

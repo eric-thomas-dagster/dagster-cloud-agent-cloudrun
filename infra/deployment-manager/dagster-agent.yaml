@@ -1,0 +1,42 @@
+# Google Cloud Deployment Manager Configuration
+# Dagster Cloud Agent on Cloud Run
+#
+# This is the native GCP equivalent to Azure ARM/Bicep templates
+#
+# Usage:
+#   1. Copy this file to dagster-agent-config.yaml
+#   2. Fill in your values below
+#   3. Deploy with:
+#      gcloud deployment-manager deployments create dagster-agent \
+#        --config dagster-agent-config.yaml
+
+imports:
+- path: dagster-agent.jinja
+
+resources:
+- name: dagster-cloud-agent
+  type: dagster-agent.jinja
+  properties:
+    # GCP Configuration
+    projectId: YOUR_PROJECT_ID  # REQUIRED: Your GCP project ID
+    region: us-central1          # GCP region for Cloud Run
+
+    # Service Account Names
+    agentServiceAccountName: dagster-agent        # SA for the agent
+    workloadsServiceAccountName: dagster-workloads  # SA for code servers/jobs
+
+    # Agent Configuration
+    agentServiceName: dagster-agent
+    agentImage: ghcr.io/YOUR_USERNAME/dagster-cloudrun-agent:latest  # REQUIRED: Your agent image
+    agentCpu: "1"
+    agentMemory: 1Gi
+
+    # Dagster Cloud Configuration
+    dagsterCloudApiToken: YOUR_AGENT_TOKEN_HERE  # REQUIRED: Base64 encoded
+    dagsterCloudOrgId: YOUR_ORG_ID_HERE          # REQUIRED: Base64 encoded
+    dagsterCloudDeploymentName: cHJvZA==          # Base64 encoded "prod"
+
+    # Secret Manager Secret Names
+    dagsterTokenSecretName: dagster-cloud-api-token
+    dagsterOrgIdSecretName: dagster-cloud-org-id
+    dagsterDeploymentSecretName: dagster-cloud-deployment
