@@ -2,6 +2,10 @@
 
 **Deploy Dagster+ hybrid agents on Google Cloud Run with automatic code server and run job management.**
 
+> **⚠️ Status: Untested Implementation**
+>
+> This is a community-contributed implementation that mirrors the architecture of the [Azure Container Apps agent](https://github.com/eric-thomas-dagster/aca-agent) but has not been tested in production. Use at your own risk and please report any issues or improvements!
+
 This repository provides a complete solution for running Dagster Cloud (Dagster+) on Google Cloud Run, including:
 - ✅ Custom agent that automatically creates code servers on Cloud Run
 - ✅ Ephemeral run workers as Cloud Run Jobs
